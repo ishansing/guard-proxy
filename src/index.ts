@@ -5,12 +5,16 @@ import { dlpMiddleware } from "./middleware/dlp";
 import health from "./routes/health";
 import type { Variables } from "./types";
 
-const app = new Hono<{ Variables: Variables }>(); // ✅ typed context
+import dashboard from "./routes/dasboard";
+
+const app = new Hono<{ Variables: Variables }>(); // typed context
 
 app.use("*", requestLogger);
 app.use("*", dlpMiddleware);
 
 app.route("/health", health);
+
+app.route("/api", dashboard);
 
 app.all("*", async (c) => {
   const targetHost =
@@ -45,5 +49,6 @@ app.onError((err, c) => {
 
 export default {
   port: Number(Bun.env.PORT ?? 3000),
+  idleTimeout: 0,
   fetch: app.fetch,
 };
