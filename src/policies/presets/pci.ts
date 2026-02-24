@@ -19,11 +19,12 @@ export const pciPolicy: Policy = {
     },
     {
       name: "Block CVV Codes",
-      description: "Card validation codes must never be stored or transmitted",
+      description: "CVV only triggers near credit cards (proximity)",
       action: "block",
       direction: "both",
-      entityTypes: [],
-      patternNames: [],
+      entityTypes: ["CREDIT_CARD"], // ML credit card nearby
+      patternNames: ["CVV_CODE", "CREDIT_CARD"], // regex nearby
+      proximityDistance: 50, // within 50 chars of card number
       severity: "critical",
       enabled: true,
     },

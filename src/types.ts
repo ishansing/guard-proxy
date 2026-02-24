@@ -22,6 +22,7 @@ export interface PolicyRule {
   direction: PolicyDirection;
   entityTypes: string[]; // Presidio entity types to match
   patternNames?: string[]; // Regex pattern names to match (from patterns.ts)
+  proximityDistance?: number;
   severity: "low" | "medium" | "high" | "critical";
   enabled: boolean;
 }

@@ -1,6 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { redact } from "../utils/redact";
 import { mlRedact } from "../utils/mlRedact";
+import { evaluatePolicy } from "../policies/engine";
 import type { Variables } from "../types";
 
 const ML_ENABLED = Bun.env.ML_ENABLED === "true";
@@ -8,72 +9,56 @@ const ML_ENABLED = Bun.env.ML_ENABLED === "true";
 async function runHybridScan(
   text: string,
   path: string,
-  direction: "REQUEST" | "RESPONSE",
-) {
-  // --- Pass 1: Regex (fast, structured PII) ---
+  direction: "request" | "response",
+): Promise<{ clean: string; blocked: boolean }> {
+  // Pass 1: Regex
   const regexResult = redact(text);
+  const hitPatternNames = regexResult.hits.map((h) => h.name);
 
-  if (regexResult.wasModified) {
+  // Pass 2: ML
+  let mlEntityTypes: string[] = [];
+  let afterML = regexResult.clean;
+
+  if (ML_ENABLED) {
+    const mlResult = await mlRedact(regexResult.clean);
+    mlEntityTypes = [
+      ...mlResult.blocked.map((e) => e.entity_type),
+      ...mlResult.flagged.map((e) => e.entity_type),
+    ];
+    afterML = mlResult.clean;
+  }
+
+  // Pass 3: Policy engine decision
+  const decision = evaluatePolicy(
+    mlEntityTypes,
+    hitPatternNames,
+    direction,
+    text,
+  );
+
+  if (decision.matchedRules.length > 0) {
     console.warn(
       JSON.stringify({
         ts: new Date().toISOString(),
-        event: `DLP_REGEX_HIT_${direction}`,
+        event: "POLICY_DECISION",
         path,
-        hits: regexResult.hits,
+        direction,
+        action: decision.action,
+        matchedRules: decision.matchedRules,
       }),
     );
   }
 
-  // --- Pass 2: ML/NER (context-aware, freeform PII) ---
-  if (!ML_ENABLED) return regexResult.clean;
-
-  const mlResult = await mlRedact(regexResult.clean);
-
-  if (mlResult.skipped) {
-    console.warn(
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        event: "ML_FALLBACK_REGEX_ONLY",
-        path,
-      }),
-    );
-    return regexResult.clean;
+  // Apply policy action
+  if (decision.action === "block") {
+    return { clean: "[BLOCKED BY POLICY]", blocked: true };
   }
 
-  if (mlResult.blocked.length > 0) {
-    console.warn(
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        event: `DLP_ML_BLOCKED_${direction}`,
-        path,
-        entities: mlResult.blocked.map((e) => ({
-          type: e.entity_type,
-          score: e.score,
-        })),
-      }),
-    );
-  }
-
-  if (mlResult.flagged.length > 0) {
-    console.info(
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        event: `DLP_ML_FLAGGED_${direction}`,
-        path,
-        entities: mlResult.flagged.map((e) => ({
-          type: e.entity_type,
-          score: e.score,
-        })),
-      }),
-    );
-  }
-
-  return mlResult.clean;
+  return { clean: afterML, blocked: false };
 }
 
 export const dlpMiddleware = createMiddleware<{ Variables: Variables }>(
   async (c, next) => {
-    // --- Scan REQUEST ---
     const contentType = c.req.header("content-type") ?? "";
     let cleanBody: string | undefined;
 
@@ -82,22 +67,30 @@ export const dlpMiddleware = createMiddleware<{ Variables: Variables }>(
       contentType.includes("text")
     ) {
       const body = await c.req.text();
-      cleanBody = await runHybridScan(body, c.req.path, "REQUEST");
+      const { clean, blocked } = await runHybridScan(
+        body,
+        c.req.path,
+        "request",
+      );
+
+      if (blocked) {
+        return c.json({ error: "Request blocked by DLP policy" }, 403);
+      }
+      cleanBody = clean;
     }
 
     c.set("cleanBody", cleanBody);
     await next();
 
-    // --- Scan RESPONSE ---
     const respContentType = c.res.headers.get("content-type") ?? "";
     if (
       respContentType.includes("application/json") ||
       respContentType.includes("text")
     ) {
       const respText = await c.res.text();
-      const cleanResp = await runHybridScan(respText, c.req.path, "RESPONSE");
+      const { clean } = await runHybridScan(respText, c.req.path, "response");
 
-      c.res = new Response(cleanResp, {
+      c.res = new Response(clean, {
         status: c.res.status,
         headers: c.res.headers,
       });

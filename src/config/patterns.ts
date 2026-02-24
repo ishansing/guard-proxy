@@ -41,4 +41,34 @@ export const DLP_PATTERNS: DLPPattern[] = [
     pattern: /("password"\s*:\s*"[^"]+"|password=[^&\s]+)/gi,
     severity: "critical",
   },
+  {
+    name: "CVV_CODE",
+    // handles JSON format "cvv":123 and "cvv": 123
+    pattern:
+      /(?:"(?:cvv|cvv2|cvc|cid)"\s*:\s*\d{3,4})|(?:\b(?:cvv|cvv2|cvc|cid)[\s:=]*\d{3,4}\b)/gi,
+    severity: "critical",
+  },
 ];
+
+export const CVV_WHITELIST = [
+  "100",
+  "101",
+  "102", // HTTP status codes
+  "200",
+  "201",
+  "404",
+  "500", // HTTP codes
+  "5000",
+  "10000", // common amounts
+];
+
+export function isSafeCVV(match: string, context: string): boolean {
+  const num = match.trim();
+  if (CVV_WHITELIST.includes(num)) return true;
+
+  // Check context for safe words
+  const safeContext = /\b(?:price|amount|quantity|code|id|status)\b/i.test(
+    context,
+  );
+  return safeContext;
+}
