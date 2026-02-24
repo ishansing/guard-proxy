@@ -4,6 +4,9 @@ import { mlRedact } from "../utils/mlRedact";
 import { evaluatePolicy } from "../policies/engine";
 import type { Variables } from "../types";
 
+import { pushEvent } from "../store/events";
+import { randomUUID } from "crypto";
+
 const ML_ENABLED = Bun.env.ML_ENABLED === "true";
 
 async function runHybridScan(
@@ -37,16 +40,17 @@ async function runHybridScan(
   );
 
   if (decision.matchedRules.length > 0) {
-    console.warn(
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        event: "POLICY_DECISION",
-        path,
-        direction,
-        action: decision.action,
-        matchedRules: decision.matchedRules,
-      }),
-    );
+    const ev = {
+      id: randomUUID(),
+      ts: new Date().toISOString(),
+      event: "POLICY_DECISION",
+      path,
+      direction,
+      action: decision.action,
+      matchedRules: decision.matchedRules,
+    };
+    console.warn(JSON.stringify(ev));
+    pushEvent(ev); // ✅ send to dashboard
   }
 
   // Apply policy action
