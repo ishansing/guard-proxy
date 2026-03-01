@@ -55,10 +55,15 @@ export async function mlRedact(text: string): Promise<MLRedactResult> {
   const toRedact = [...blocked].sort((a, b) => b.start - a.start);
 
   for (const entity of toRedact) {
+    const isInsideQuotes =
+      text[entity.start - 1] === '"' && text[entity.end] === '"';
+
+    const replacement = isInsideQuotes
+      ? `[REDACTED:${entity.entity_type}]`
+      : `"[REDACTED:${entity.entity_type}]"`;
+
     clean =
-      clean.slice(0, entity.start) +
-      `[REDACTED:${entity.entity_type}]` +
-      clean.slice(entity.end);
+      clean.slice(0, entity.start) + replacement + clean.slice(entity.end);
   }
 
   return { clean, blocked, flagged, skipped: false };

@@ -16,7 +16,14 @@ export function redact(text: string): RedactResult {
     if (matches) {
       hits.push({ name, severity, count: matches.length });
       pattern.lastIndex = 0;
-      clean = clean.replace(pattern, `[REDACTED:${name}]`);
+      // If the pattern has capturing groups, we might want to preserve group 1 (the key)
+      // and only redact the rest.
+      clean = clean.replace(pattern, (match, p1) => {
+        if (p1 && match.startsWith(p1)) {
+          return `${p1}"[REDACTED:${name}]"`;
+        }
+        return `[REDACTED:${name}]`;
+      });
     }
     pattern.lastIndex = 0;
   }

@@ -8,8 +8,9 @@ import { pushEvent } from "../store/events";
 import { randomUUID } from "crypto";
 
 const ML_ENABLED = Bun.env.ML_ENABLED === "true";
+const MAX_PAYLOAD_SIZE = Number(Bun.env.MAX_PAYLOAD_SIZE ?? 1024 * 1024 * 5); // 5MB default
 
-async function runHybridScan(
+export async function runHybridScan(
   text: string,
   path: string,
   direction: "request" | "response",
@@ -73,14 +74,22 @@ async function runHybridScan(
 
 export const dlpMiddleware = createMiddleware<{ Variables: Variables }>(
   async (c, next) => {
-    // Skip DLP for internal dashboard API
-    if (c.req.path.startsWith("/api/")) {
+    // Skip DLP for internal routes
+    if (c.req.path.startsWith("/api/") || c.req.path.startsWith("/health")) {
       return await next();
     }
 
+    const MAX_PAYLOAD_SIZE = Number(Bun.env.MAX_PAYLOAD_SIZE ?? 1024 * 1024 * 5); // 5MB default
+
     const reqId = randomUUID();
     const contentType = c.req.header("content-type") ?? "";
+    const contentLength = Number(c.req.header("content-length") ?? 0);
     let cleanBody: string | undefined;
+
+    // DoS Prevention: Check payload size before reading into memory
+    if (contentLength > MAX_PAYLOAD_SIZE) {
+      return c.json({ error: "Payload too large for DLP scanning" }, 413);
+    }
 
     if (
       contentType.includes("application/json") ||

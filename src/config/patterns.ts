@@ -38,14 +38,14 @@ export const DLP_PATTERNS: DLPPattern[] = [
   },
   {
     name: "PASSWORD_FIELD",
-    pattern: /("password"\s*:\s*"[^"]+"|password=[^&\s]+)/gi,
+    // Redact only the value of the password field
+    pattern: /("password"\s*:\s*)"[^"]+"/gi,
     severity: "critical",
   },
   {
     name: "CVV_CODE",
-    // handles JSON format "cvv":123 and "cvv": 123
-    pattern:
-      /(?:"(?:cvv|cvv2|cvc|cid)"\s*:\s*\d{3,4})|(?:\b(?:cvv|cvv2|cvc|cid)[\s:=]*\d{3,4}\b)/gi,
+    // Redact only the numeric value of the CVV
+    pattern: /("(?:cvv|cvv2|cvc|cid)"\s*:\s*)\d{3,4}/gi,
     severity: "critical",
   },
 ];

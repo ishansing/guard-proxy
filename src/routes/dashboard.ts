@@ -7,7 +7,8 @@ import { db, schema } from "../db";
 
 const dashboard = new Hono();
 
-dashboard.use("*", cors({ origin: "http://localhost:5173" }));
+const ALLOWED_ORIGIN = Bun.env.DASHBOARD_ALLOWED_ORIGIN ?? "http://localhost:5173";
+dashboard.use("*", cors({ origin: ALLOWED_ORIGIN }));
 
 // Live SSE stream
 dashboard.get("/events/stream", async (c) => {
@@ -20,7 +21,9 @@ dashboard.get("/events/stream", async (c) => {
       });
     });
 
-    stream.onAbort(unsubscribe);
+    stream.onAbort(() => {
+      unsubscribe();
+    });
 
     while (!stream.closed) {
       await stream.sleep(30000);
@@ -48,7 +51,7 @@ dashboard.get("/events/history", async (c) => {
 // Persistent stats from PostgreSQL
 dashboard.get("/stats", async (c) => {
   const [totalRes] = await db.select({ value: count() }).from(schema.dlpEvents);
-  const total = Number(totalRes.value);
+  const total = totalRes ? Number(totalRes.value) : 0;
 
   const byActionRes = await db
     .select({
