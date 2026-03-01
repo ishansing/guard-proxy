@@ -27,9 +27,9 @@ export const defaultPolicy: Policy = {
       enabled: true,
     },
     {
-      name: "Flag Emails",
-      description: "Log and flag outgoing email addresses",
-      action: "flag",
+      name: "Redact Emails",
+      description: "Redact outgoing email addresses",
+      action: "redact",
       direction: "both",
       entityTypes: ["EMAIL_ADDRESS"],
       patternNames: ["EMAIL"],

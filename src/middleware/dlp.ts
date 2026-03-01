@@ -13,6 +13,7 @@ async function runHybridScan(
   text: string,
   path: string,
   direction: "request" | "response",
+  reqId: string,
 ): Promise<{ clean: string; blocked: boolean }> {
   // Pass 1: Regex
   const regexResult = redact(text);
@@ -42,15 +43,18 @@ async function runHybridScan(
   if (decision.matchedRules.length > 0) {
     const ev = {
       id: randomUUID(),
+      reqId,
       ts: new Date().toISOString(),
       event: "POLICY_DECISION",
       path,
       direction,
       action: decision.action,
-      matchedRules: decision.matchedRules,
+      matchedRules: decision.matchedRules.map((m) => m.name),
+      ruleMatches: decision.matchedRules,
+      hits: regexResult.hits,
     };
     console.warn(JSON.stringify(ev));
-    pushEvent(ev); // ✅ send to dashboard
+    pushEvent(ev);
   }
 
   // Apply policy action
@@ -58,11 +62,23 @@ async function runHybridScan(
     return { clean: "[BLOCKED BY POLICY]", blocked: true };
   }
 
-  return { clean: afterML, blocked: false };
+  // If policy says redact, use the cleaned text (which includes Regex + ML redactions)
+  // If policy says flag/log-only/allow, return original text to avoid unnecessary redaction (like dates)
+  if (decision.action === "redact") {
+    return { clean: afterML, blocked: false };
+  }
+
+  return { clean: text, blocked: false };
 }
 
 export const dlpMiddleware = createMiddleware<{ Variables: Variables }>(
   async (c, next) => {
+    // Skip DLP for internal dashboard API
+    if (c.req.path.startsWith("/api/")) {
+      return await next();
+    }
+
+    const reqId = randomUUID();
     const contentType = c.req.header("content-type") ?? "";
     let cleanBody: string | undefined;
 
@@ -75,6 +91,7 @@ export const dlpMiddleware = createMiddleware<{ Variables: Variables }>(
         body,
         c.req.path,
         "request",
+        reqId,
       );
 
       if (blocked) {
@@ -92,7 +109,12 @@ export const dlpMiddleware = createMiddleware<{ Variables: Variables }>(
       respContentType.includes("text")
     ) {
       const respText = await c.res.text();
-      const { clean } = await runHybridScan(respText, c.req.path, "response");
+      const { clean } = await runHybridScan(
+        respText,
+        c.req.path,
+        "response",
+        reqId,
+      );
 
       c.res = new Response(clean, {
         status: c.res.status,

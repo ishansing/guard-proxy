@@ -1,11 +1,13 @@
 export interface DLPEvent {
   id: string;
+  reqId?: string; // Links request and response
   ts: string;
   event: string;
   path: string;
   direction: "request" | "response";
   action: string;
   matchedRules: string[];
+  ruleMatches?: { name: string; action: string }[];
   hits?: { name: string; severity: string; count: number }[];
 }
 

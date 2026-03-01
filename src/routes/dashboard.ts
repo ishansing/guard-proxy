@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { cors } from "hono/cors";
 import { eventStore, subscribe } from "../store/events";
+import { getActivePolicies } from "../policies/engine";
 
 const dashboard = new Hono();
 
@@ -35,7 +36,7 @@ dashboard.get("/events/stream", async (c) => {
     });
 
     // Clean up on disconnect
-    stream.onAbort(unsubscribe);
+    stream.onAbort(() => { unsubscribe(); });
 
     // Keep connection alive
     while (!stream.closed) {
@@ -49,14 +50,21 @@ dashboard.get("/events/stream", async (c) => {
 
 // GET stats summary
 dashboard.get("/stats", (c) => {
-  const total = eventStore.length;
-  const byAction = eventStore.reduce(
-    (acc, e) => {
-      acc[e.action] = (acc[e.action] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
+  const reqIds = new Set(eventStore.map((e) => e.reqId || e.id));
+  const total = reqIds.size;
+  const byAction: Record<string, number> = {};
+
+  for (const ev of eventStore) {
+    // If we have granular rule matches, count each one
+    if (ev.ruleMatches && ev.ruleMatches.length > 0) {
+      for (const match of ev.ruleMatches) {
+        byAction[match.action] = (byAction[match.action] ?? 0) + 1;
+      }
+    } else {
+      // Fallback to the top-level action if ruleMatches is missing
+      byAction[ev.action] = (byAction[ev.action] ?? 0) + 1;
+    }
+  }
 
   const byRule = eventStore
     .flatMap((e) => e.matchedRules)
@@ -73,7 +81,6 @@ dashboard.get("/stats", (c) => {
 
 // GET active policies
 dashboard.get("/policies", (c) => {
-  const { getActivePolicies } = require("../policies/engine");
   return c.json(getActivePolicies());
 });
 

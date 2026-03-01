@@ -5,7 +5,7 @@ export const hipaaPolicy: Policy = {
   name: "HIPAA Compliance",
   description:
     "Health Insurance Portability and Accountability Act — 18 PHI identifiers",
-  enabled: false,
+  enabled: true,
   rules: [
     {
       name: "Redact Patient Names",

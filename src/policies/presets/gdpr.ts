@@ -5,7 +5,7 @@ export const gdprPolicy: Policy = {
   name: "GDPR Compliance",
   description:
     "EU General Data Protection Regulation — Article 9 special categories",
-  enabled: false, // opt-in
+  enabled: true, // opt-in
   rules: [
     {
       name: "Redact Personal Names",

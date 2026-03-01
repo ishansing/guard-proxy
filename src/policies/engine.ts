@@ -60,7 +60,7 @@ function checkProximity(
 
 export interface PolicyDecision {
   action: PolicyAction;
-  matchedRules: string[];
+  matchedRules: { name: string; action: PolicyAction }[];
 }
 
 export function evaluatePolicy(
@@ -69,7 +69,7 @@ export function evaluatePolicy(
   direction: "request" | "response",
   context: string,
 ): PolicyDecision {
-  const matchedRules: string[] = [];
+  const matchedRules: { name: string; action: PolicyAction }[] = [];
   let finalAction: PolicyAction = "allow";
 
   for (const policy of getActivePolicies()) {
@@ -100,13 +100,14 @@ export function evaluatePolicy(
         (matchesEntity || matchesPattern) && hasProximity && !cvvSafe;
 
       if (matches) {
-        matchedRules.push(`[${policy.name}] ${rule.name}`);
-        if (priority.indexOf(rule.action) < priority.indexOf(finalAction)) {
-          finalAction = rule.action;
+        const ruleName = `[${policy.name}] ${rule.name}`;
+        const ruleAction = rule.action.toLowerCase() as PolicyAction;
+        matchedRules.push({ name: ruleName, action: ruleAction });
+        if (priority.indexOf(ruleAction) < priority.indexOf(finalAction)) {
+          finalAction = ruleAction;
         }
       }
     }
   }
-
   return { action: finalAction, matchedRules };
 }

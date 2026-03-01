@@ -5,7 +5,7 @@ export const pciPolicy: Policy = {
   name: "PCI-DSS Compliance",
   description:
     "Payment Card Industry Data Security Standard — cardholder data protection",
-  enabled: false,
+  enabled: true,
   rules: [
     {
       name: "Block Credit Card Numbers (PAN)",

@@ -5,7 +5,7 @@ import { dlpMiddleware } from "./middleware/dlp";
 import health from "./routes/health";
 import type { Variables } from "./types";
 
-import dashboard from "./routes/dasboard";
+import dashboard from "./routes/dashboard";
 
 const app = new Hono<{ Variables: Variables }>(); // typed context
 
