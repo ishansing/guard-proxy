@@ -27,5 +27,6 @@
     "noPropertyAccessFromIndexSignature": false,
 
     "types": ["bun-types"]
-  }
+  },
+  "exclude": ["dashboard", "node_modules"]
 }
