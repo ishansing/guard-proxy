@@ -1,0 +1,1 @@
+ALTER TABLE "dlp_events" ADD COLUMN "req_id" text;

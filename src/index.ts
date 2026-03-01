@@ -5,6 +5,8 @@ import { dlpMiddleware } from "./middleware/dlp";
 import health from "./routes/health";
 import type { Variables } from "./types";
 
+import { prometheus } from "@hono/prometheus";
+
 import dashboard from "./routes/dashboard";
 
 const app = new Hono<{ Variables: Variables }>(); // typed context
@@ -15,6 +17,11 @@ app.use("*", dlpMiddleware);
 app.route("/health", health);
 
 app.route("/api", dashboard);
+
+// Prometheus metrics
+const { printMetrics, registerMetrics } = prometheus();
+app.use("*", registerMetrics);
+app.get("/metrics", printMetrics);
 
 app.all("*", async (c) => {
   const targetHost =

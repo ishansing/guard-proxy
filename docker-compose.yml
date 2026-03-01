@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   presidio-analyzer:
     image: mcr.microsoft.com/presidio-analyzer:latest
@@ -12,3 +10,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: guard-db
+    environment:
+      POSTGRES_USER: guard
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: guardproxy
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guard -d guardproxy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
