@@ -8,18 +8,18 @@ export function useDLPEvents() {
   useEffect(() => {
     fetch("/api/events")
       .then((r) => r.json())
-      .then(setEvents);
+      .then((data: DLPEvent[]) => setEvents(data));
 
     function connect() {
       const es = new EventSource("/api/events/stream");
       esRef.current = es;
 
       es.addEventListener("dlp-event", (e) => {
-        const ev: DLPEvent = JSON.parse(e.data);
+        const ev: DLPEvent = JSON.parse((e as MessageEvent).data);
         setEvents((prev) => [ev, ...prev].slice(0, 500));
       });
 
-      // ✅ Auto-reconnect on error
+      // Auto-reconnect on error
       es.onerror = () => {
         es.close();
         setTimeout(connect, 3000);

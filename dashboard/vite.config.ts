@@ -12,7 +12,7 @@ export default defineConfig({
         changeOrigin: true,
         ws: false,
         configure: (proxy) => {
-          proxy.on("proxyReq", (proxyReq, req, res) => {
+          proxy.on("proxyReq", (proxyReq, _req, res) => {
             // Keep SSE connection alive on disconnect
             res.on("close", () => {
               if (!res.writableEnded) proxyReq.destroy();
